@@ -1,0 +1,57 @@
+name: Repo Health Badge
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 12 * * 0'
+
+permissions:
+  contents: write
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Health Analysis
+        id: health
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          OUTPUT_FORMAT: svg
+          OUTPUT_PATH: health-badge.svg
+        run: |
+          pip install requests --quiet
+          python src/action.py
+
+          # 读取 JSON 结果
+          if [ -f "health-badge.json" ]; then
+            SCORE=$(python -c "import json; d=json.load(open('health-badge.json')); print(d['score'])")
+            GRADE=$(python -c "import json; d=json.load(open('health-badge.json')); print(d['grade'])")
+            echo "score=$SCORE" >> $GITHUB_OUTPUT
+            echo "grade=$GRADE" >> $GITHUB_OUTPUT
+          else
+            echo "score=0" >> $GITHUB_OUTPUT
+            echo "grade=F" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit Badge
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p .github
+          cp health-badge.svg .github/health-badge.svg 2>/dev/null || true
+          cp health-badge.json .github/health-badge.json 2>/dev/null || true
+          git add .github/
+          git diff --staged --quiet || git commit -m "chore: update health badge [skip ci]"
+          git push

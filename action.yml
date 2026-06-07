@@ -1,0 +1,46 @@
+name: 'Repo Health Badge'
+description: '生成仓库健康评分徽章，分析 Stars、Forks、活跃度、代码质量等指标'
+author: 'LIE28-MAX'
+
+inputs:
+  token:
+    description: 'GitHub Token（可选，增加 API 限额）'
+    required: false
+    default: ''
+  output-format:
+    description: '输出格式: svg 或 json'
+    required: false
+    default: 'svg'
+  output-path:
+    description: '徽章输出路径'
+    required: false
+    default: 'health-badge.svg'
+
+outputs:
+  score:
+    description: '健康评分 (0-100)'
+  grade:
+    description: '等级 (A/B/C/D/F)'
+  badge-path:
+    description: '徽章文件路径'
+  summary:
+    description: '详细报告'
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: 分析仓库健康
+      shell: bash
+      run: python ${{ github.action_path }}/src/action.py
+      env:
+        GITHUB_TOKEN: ${{ inputs.token || github.token }}
+        OUTPUT_FORMAT: ${{ inputs.output-format }}
+        OUTPUT_PATH: ${{ inputs.output-path }}
+
+branding:
+  icon: 'heart-pulse'
+  color: 'green'
