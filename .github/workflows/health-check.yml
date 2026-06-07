@@ -1,0 +1,214 @@
+name: Repo Health Badge
+description: Generate a health score badge for your repository - checks README, LICENSE, CI, tests, docs, and more
+author: GitHub User
+
+# 仅在手动触发或 push 到 main 时运行
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # 每天自动运行一次
+    - cron: '0 12 * * *'
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Repo Health Check
+        id: health
+        run: |
+          # 初始化分数
+          SCORE=0
+          MAX_SCORE=100
+          DETAILS=""
+
+          # 1. README 检查 (20分)
+          if [ -f "README.md" ] || [ -f "readme.md" ] || [ -f "README.rst" ]; then
+            SCORE=$((SCORE + 10))
+            DETAILS="${DETAILS}✅ README 存在 (+10)\n"
+            # 检查 README 长度
+            README_FILE=$(ls README* readme* 2>/dev/null | head -1)
+            LINES=$(wc -l < "$README_FILE" 2>/dev/null || echo "0")
+            if [ "$LINES" -gt 20 ]; then
+              SCORE=$((SCORE + 10))
+              DETAILS="${DETAILS}✅ README 内容充实 (${LINES}行, +10)\n"
+            else
+              DETAILS="${DETAILS}⚠️ README 内容较少 (${LINES}行, +0)\n"
+            fi
+          else
+            DETAILS="${DETAILS}❌ 缺少 README (-20)\n"
+          fi
+
+          # 2. LICENSE 检查 (10分)
+          if [ -f "LICENSE" ] || [ -f "LICENSE.md" ] || [ -f "LICENSE.txt" ] || [ -f "COPYING" ]; then
+            SCORE=$((SCORE + 10))
+            DETAILS="${DETAILS}✅ LICENSE 存在 (+10)\n"
+          else
+            DETAILS="${DETAILS}❌ 缺少 LICENSE (-10)\n"
+          fi
+
+          # 3. CONTRIBUTING 指南 (10分)
+          if [ -f "CONTRIBUTING.md" ] || [ -f "CONTRIBUTING" ]; then
+            SCORE=$((SCORE + 10))
+            DETAILS="${DETAILS}✅ CONTRIBUTING 存在 (+10)\n"
+          else
+            DETAILS="${DETAILS}⚠️ 缺少 CONTRIBUTING (-10)\n"
+          fi
+
+          # 4. .gitignore 检查 (5分)
+          if [ -f ".gitignore" ]; then
+            SCORE=$((SCORE + 5))
+            DETAILS="${DETAILS}✅ .gitignore 存在 (+5)\n"
+          else
+            DETAILS="${DETAILS}⚠️ 缺少 .gitignore (-5)\n"
+          fi
+
+          # 5. CI/CD 检查 (15分)
+          if [ -d ".github/workflows" ]; then
+            WF_COUNT=$(ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null | wc -l)
+            SCORE=$((SCORE + 10))
+            DETAILS="${DETAILS}✅ GitHub Actions 存在 (${WF_COUNT}个workflow, +10)\n"
+            # 检查是否有测试 workflow
+            if ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null | xargs grep -l -i "test" >/dev/null 2>&1; then
+              SCORE=$((SCORE + 5))
+              DETAILS="${DETAILS}✅ 包含测试 workflow (+5)\n"
+            else
+              DETAILS="${DETAILS}⚠️ 没有测试 workflow (+0)\n"
+            fi
+          elif [ -f ".travis.yml" ] || [ -f "Jenkinsfile" ] || [ -f ".circleci/config.yml" ]; then
+            SCORE=$((SCORE + 10))
+            DETAILS="${DETAILS}✅ 其他 CI 系统 (+10)\n"
+          else
+            DETAILS="${DETAILS}❌ 没有 CI/CD (-15)\n"
+          fi
+
+          # 6. 测试文件检查 (10分)
+          TEST_FILES=$(find . -name "*test*" -o -name "*spec*" -o -name "test_*" -o -name "*_test.*" 2>/dev/null | grep -v node_modules | grep -v .git | wc -l)
+          if [ "$TEST_FILES" -gt 0 ]; then
+            SCORE=$((SCORE + 10))
+            DETAILS="${DETAILS}✅ 找到 ${TEST_FILES} 个测试文件 (+10)\n"
+          else
+            DETAILS="${DETAILS}⚠️ 没有找到测试文件 (-10)\n"
+          fi
+
+          # 7. 文档检查 (10分)
+          DOC_FILES=$(find . -name "*.md" -not -name "README*" -not -name "CONTRIBUTING*" -not -name "LICENSE*" -not -name "CHANGELOG*" 2>/dev/null | grep -v node_modules | grep -v .git | wc -l)
+          if [ "$DOC_FILES" -gt 0 ]; then
+            SCORE=$((SCORE + 5))
+            DETAILS="${DETAILS}✅ 有额外文档 (${DOC_FILES}个文件, +5)\n"
+          fi
+          if [ -d "docs" ] || [ -d "doc" ]; then
+            SCORE=$((SCORE + 5))
+            DETAILS="${DETAILS}✅ docs 目录存在 (+5)\n"
+          else
+            DETAILS="${DETAILS}⚠️ 没有 docs 目录 (+0)\n"
+          fi
+
+          # 8. Issue/PR 模板 (5分)
+          if [ -d ".github/ISSUE_TEMPLATE" ] || [ -f ".github/ISSUE_TEMPLATE.md" ]; then
+            SCORE=$((SCORE + 5))
+            DETAILS="${DETAILS}✅ Issue 模板存在 (+5)\n"
+          else
+            DETAILS="${DETAILS}⚠️ 没有 Issue 模板 (+0)\n"
+          fi
+
+          # 9. Security 检查 (5分)
+          if [ -f "SECURITY.md" ] || [ -f ".github/SECURITY.md" ]; then
+            SCORE=$((SCORE + 5))
+            DETAILS="${DETAILS}✅ SECURITY.md 存在 (+5)\n"
+          else
+            DETAILS="${DETAILS}⚠️ 缺少 SECURITY.md (+0)\n"
+          fi
+
+          # 10. CHANGELOG 检查 (5分)
+          if [ -f "CHANGELOG.md" ] || [ -f "CHANGELOG" ] || [ -f "CHANGES.md" ]; then
+            SCORE=$((SCORE + 5))
+            DETAILS="${DETAILS}✅ CHANGELOG 存在 (+5)\n"
+          else
+            DETAILS="${DETAILS}⚠️ 缺少 CHANGELOG (+0)\n"
+          fi
+
+          # 11. 代码质量工具 (5分)
+          if [ -f ".eslintrc.js" ] || [ -f ".eslintrc.json" ] || [ -f "eslint.config.js" ] || [ -f ".pylintrc" ] || [ -f "pyproject.toml" ] || [ -f ".flake8" ]; then
+            SCORE=$((SCORE + 5))
+            DETAILS="${DETAILS}✅ 代码质量工具配置 (+5)\n"
+          else
+            DETAILS="${DETAILS}⚠️ 没有代码质量工具 (+0)\n"
+          fi
+
+          # 生成颜色
+          if [ "$SCORE" -ge 80 ]; then
+            COLOR="brightgreen"
+          elif [ "$SCORE" -ge 60 ]; then
+            COLOR="green"
+          elif [ "$SCORE" -ge 40 ]; then
+            COLOR="yellow"
+          else
+            COLOR="red"
+          fi
+
+          # 设置输出
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          echo "color=$COLOR" >> $GITHUB_OUTPUT
+          echo "details<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$DETAILS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "## 🏥 Repo Health Score: ${SCORE}/100" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo -e "$DETAILS" >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate Badge SVG
+        run: |
+          SCORE=${{ steps.health.outputs.score }}
+          COLOR=${{ steps.health.outputs.color }}
+          
+          # 生成 SVG badge
+          cat > health-badge.svg << EOF
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="106" height="20" role="img" aria-label="health: ${SCORE}">
+            <title>health: ${SCORE}</title>
+            <linearGradient id="s" x2="0" y2="100%">
+              <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+              <stop offset="1" stop-opacity=".1"/>
+            </linearGradient>
+            <clipPath id="r">
+              <rect width="106" height="20" rx="3" fill="#fff"/>
+            </clipPath>
+            <g clip-path="url(#r)">
+              <rect width="63" height="20" fill="#555"/>
+              <rect x="63" width="43" height="20" fill="${COLOR}"/>
+              <rect width="106" height="20" fill="url(#s)"/>
+            </g>
+            <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="110">
+              <rect x="0" width="0" height="0" fill="#fff"/>
+              <text x="325" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="530">health</text>
+              <text x="325" y="140" fill="#fff" transform="scale(.1)" textLength="530">health</text>
+              <text x="845" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="330">${SCORE}</text>
+              <text x="845" y="140" fill="#fff" transform="scale(.1)" textLength="330">${SCORE}</text>
+            </g>
+          </svg>
+          EOF
+          
+          # 保存 badge
+          cp health-badge.svg .github/health-badge.svg 2>/dev/null || true
+
+      - name: Commit Badge
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p .github
+          cp health-badge.svg .github/health-badge.svg
+          git add .github/health-badge.svg
+          git diff --staged --quiet || git commit -m "chore: update health badge [skip ci]"
+          git push
