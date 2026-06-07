@@ -1,0 +1,35 @@
+{
+  "score": 23,
+  "grade": "D",
+  "details": {},
+  "checks": [
+    {
+      "name": "基础指标",
+      "score": 0.0,
+      "max": 30,
+      "detail": "Stars 0 | Forks 0 | Watchers 0"
+    },
+    {
+      "name": "项目活跃度",
+      "score": 2.0,
+      "max": 25,
+      "detail": "近30天 4 次提交 | 0 个开放Issue"
+    },
+    {
+      "name": "代码质量",
+      "score": 20.8,
+      "max": 25,
+      "detail": "License, README, CONTRIBUTING, SECURITY, FUNDING"
+    },
+    {
+      "name": "社区健康",
+      "score": 0.0,
+      "max": 20,
+      "detail": "无"
+    }
+  ],
+  "repo": "lie28-max/repo-health-badge",
+  "name": "repo-health-badge",
+  "description": "Generate health score badges for your repositories - checks README, LICENSE, CI/CD, tests, docs and more",
+  "updated_at": "2026-06-07T22:10:44.239533"
+}
